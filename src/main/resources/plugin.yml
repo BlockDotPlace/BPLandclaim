@@ -1,0 +1,15 @@
+name: Landclaim
+version: '1.0-SNAPSHOT'
+main: place.block.landclaim.Landclaim
+api-version: '1.21'
+commands:
+  claim:
+    description: Manage land claims
+    usage: /claim <info|blocks|delete|cancel|whitelist|unwhitelist|perms|attr|manage|reload|cull>
+permissions:
+  landclaim.admin.cull:
+    description: Allows manual claim culling by playtime threshold
+    default: op
+  landclaim.admin.reload:
+    description: Allows reloading the Landclaim plugin configuration
+    default: op

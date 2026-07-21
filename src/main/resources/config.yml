@@ -1,0 +1,70 @@
+held_item_id: minecraft:golden_shovel
+max_claims: 96
+max_claim_width: -1
+max_claim_depth: -1
+max_claim_area: -1
+claim_block_tiers:
+  - hours: 0
+    blocks: 1024
+  - hours: 10
+    blocks: 4096
+  - hours: 25
+    blocks: 8192
+  - hours: 50
+    blocks: 16384
+claim_visualization:
+  boundary_corner_material: minecraft:glowstone
+  boundary_edge_material: minecraft:light_blue_stained_glass
+claim_management_ui:
+  items:
+    claim_attributes_entry:
+      material: minecraft:comparator
+      name: Claim Attributes
+    whitelist_management_entry:
+      material: minecraft:player_head
+      name: Whitelist Management
+    close:
+      material: minecraft:barrier
+      name: Close
+    back:
+      material: minecraft:arrow
+      name: Back
+    previous_page:
+      material: minecraft:paper
+      name: Previous Page
+    next_page:
+      material: minecraft:paper
+      name: Next Page
+    add_player:
+      material: minecraft:emerald
+      name: Add Player
+    remove_from_whitelist:
+      material: minecraft:barrier
+      name: Remove From Whitelist
+    allow_explosions_label:
+      material: minecraft:tnt
+      name: Allow Explosions
+    allow_pvp_label:
+      material: minecraft:iron_sword
+      name: Allow PvP
+    block_mutation_label:
+      material: minecraft:iron_pickaxe
+      name: Block Mutation
+    block_use_label:
+      material: minecraft:oak_door
+      name: Block Use
+    entity_damage_label:
+      material: minecraft:iron_sword
+      name: Entity Damage
+    enabled_toggle:
+      material: minecraft:green_wool
+      name: Enabled
+    disabled_toggle:
+      material: minecraft:red_wool
+      name: Disabled
+    player_entry:
+      material: minecraft:player_head
+      name: Player
+  illegal_materials:
+    - minecraft:player_head
+    - minecraft:barrier
