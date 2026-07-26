@@ -8,14 +8,14 @@ import java.util.UUID
 class OwnedClaimCornerResolver(
     private val claimRepository: ClaimRepository,
 ) {
-    fun findOwnedCorner(playerUuid: UUID, clickedCorner: ClaimCorner): OwnedClaimCornerSelection? {
+    fun findOwnedCorner(playerUuid: UUID, isOp: Boolean, clickedCorner: ClaimCorner): OwnedClaimCornerSelection? {
         val containingClaim = claimRepository.findContaining(
             worldId = clickedCorner.worldId,
             x = clickedCorner.x,
             z = clickedCorner.z,
         )?.toOwnedClaim() ?: return null
 
-        if (containingClaim.ownerUuid != playerUuid) {
+        if (!containingClaim.isOwnedBy(playerUuid, isOp)) {
             return null
         }
 

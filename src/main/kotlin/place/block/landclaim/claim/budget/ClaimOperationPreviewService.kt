@@ -2,6 +2,7 @@ package place.block.landclaim.claim.budget
 
 import org.bukkit.FluidCollisionMode
 import org.bukkit.entity.Player
+import place.block.landclaim.claim.ClaimOwnerType
 import place.block.landclaim.claim.ClaimValidationResult
 import place.block.landclaim.claim.ClaimValidator
 import place.block.landclaim.claim.toClaimCorner
@@ -95,12 +96,14 @@ class ClaimOperationPreviewService(
 
         val previewArea = resize.fixedCorner.toAreaWith(targetCorner)
         val delta = previewArea.blockCount - resize.currentArea.blockCount
+        val resizedClaim = claimRepository.findById(resize.claimId.value)
         val validation = claimValidator.validateResizedClaim(
             claimId = resize.claimId,
             ownerUuid = player.uniqueId,
             currentArea = resize.currentArea,
             movedCorner = targetCorner,
             fixedCorner = resize.fixedCorner,
+            enforceOwnerLimits = resizedClaim?.ownerType != ClaimOwnerType.ADMIN,
         )
         return previewFromValidation(
             snapshot = snapshot,

@@ -17,6 +17,10 @@ sealed interface ClaimCommandResult {
         val value: Boolean,
     ) : ClaimCommandResult
 
+    data class AdminClaimUpdated(
+        val enabled: Boolean,
+    ) : ClaimCommandResult
+
     data object ManageOpened : ClaimCommandResult
 
     data object Reloaded : ClaimCommandResult
@@ -115,4 +119,6 @@ sealed interface ClaimCommandResult {
     data object CullingRequiresAdmin : ClaimCommandResult
 
     data object ReloadRequiresAdmin : ClaimCommandResult
+
+    data object AdminClaimRequiresAdmin : ClaimCommandResult
 }

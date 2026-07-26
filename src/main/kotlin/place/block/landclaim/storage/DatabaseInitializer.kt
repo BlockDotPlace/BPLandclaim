@@ -13,12 +13,14 @@ class DatabaseInitializer {
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     world_id TEXT NOT NULL,
                     owner_uuid TEXT NOT NULL,
+                    owner_type TEXT NOT NULL DEFAULT 'PLAYER',
                     min_x INTEGER NOT NULL,
                     max_x INTEGER NOT NULL,
                     min_z INTEGER NOT NULL,
                     max_z INTEGER NOT NULL,
                     allow_explosions INTEGER NOT NULL DEFAULT 1,
                     allow_pvp INTEGER NOT NULL DEFAULT 1,
+                    allow_fire_spread INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT NOT NULL
                 );
 
@@ -46,6 +48,8 @@ class DatabaseInitializer {
 
         ensureClaimColumn(connection, "allow_explosions", "INTEGER NOT NULL DEFAULT 1")
         ensureClaimColumn(connection, "allow_pvp", "INTEGER NOT NULL DEFAULT 1")
+        ensureClaimColumn(connection, "allow_fire_spread", "INTEGER NOT NULL DEFAULT 1")
+        ensureClaimColumn(connection, "owner_type", "TEXT NOT NULL DEFAULT 'PLAYER'")
         ensureClaimPermissionColumn(connection, "entity_damage", "INTEGER NOT NULL DEFAULT 1")
     }
 

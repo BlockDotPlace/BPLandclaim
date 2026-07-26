@@ -21,6 +21,7 @@ object ChatMessages {
         canDamageEntities: Boolean,
         allowExplosions: Boolean,
         allowPvp: Boolean,
+        allowFireSpread: Boolean,
     ): List<Component> {
         return listOf(
             line(infoBorder("┌"), infoTitle(" Claim Info ")),
@@ -54,6 +55,8 @@ object ChatMessages {
                 statusLabel("Explosions", allowExplosions),
                 text(" | "),
                 statusLabel("PvP", allowPvp),
+                text(" | "),
+                statusLabel("Fire Spread", allowFireSpread),
             ),
         )
     }
@@ -333,6 +336,22 @@ object ChatMessages {
         )
     }
 
+    fun adminClaimUpdated(enabled: Boolean): Component {
+        return if (enabled) {
+            line(
+                success("Claim admin updated"),
+                text(": claim is now owned by "),
+                player("Server"),
+                text("."),
+            )
+        } else {
+            line(
+                success("Claim admin updated"),
+                text(": claim is now player-owned."),
+            )
+        }
+    }
+
     fun cullPreview(thresholdHours: Int, scannedClaims: Int, matchingClaims: Int): List<Component> {
         return listOf(
             line(success("Cull Preview")),
@@ -440,6 +459,13 @@ object ChatMessages {
         return line(
             failure("Reload denied"),
             text(": admin permission required."),
+        )
+    }
+
+    fun adminClaimRequiresAdmin(): Component {
+        return line(
+            failure("Claim admin denied"),
+            text(": operator status required."),
         )
     }
 

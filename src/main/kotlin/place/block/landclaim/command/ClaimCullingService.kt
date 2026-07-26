@@ -1,5 +1,6 @@
 package place.block.landclaim.command
 
+import place.block.landclaim.claim.ClaimOwnerType
 import place.block.landclaim.playtime.PlayerPlaytimeService
 import place.block.landclaim.storage.repository.ClaimRepository
 
@@ -29,6 +30,7 @@ class ClaimCullingService(
     private fun findCullCandidates(thresholdHours: Int): CullCandidates {
         val claims = claimRepository.findAll()
         val matching = claims.filter { claim ->
+            claim.ownerType != ClaimOwnerType.ADMIN &&
             playerPlaytimeService.playedHours(claim.ownerUuid) <= thresholdHours
         }
 

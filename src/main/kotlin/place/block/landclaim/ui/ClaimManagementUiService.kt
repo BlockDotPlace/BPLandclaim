@@ -92,6 +92,11 @@ class ClaimManagementUiService(
             SLOT_ALLOW_PVP_TOGGLE -> {
                 toggleAttribute(player, session, ClaimAttributeFlag.ALLOW_PVP)
             }
+
+            SLOT_ALLOW_FIRE_SPREAD_TOGGLE -> {
+                toggleAttribute(player, session, ClaimAttributeFlag.ALLOW_FIRE_SPREAD)
+            }
+
         }
     }
 
@@ -162,7 +167,14 @@ class ClaimManagementUiService(
             }
 
             SLOT_FULL_NEXT_PAGE -> {
-                val totalPages = addPlayerTotalPages(session.claimId, player.uniqueId)
+                val claim = claimRepository.findById(session.claimId)?.toOwnedClaim()
+                    ?: run {
+                        clearSession(player)
+                        player.closeInventory()
+                        player.sendMessage(ChatMessages.plain("Claim management closed."))
+                        return
+                    }
+                val totalPages = addPlayerTotalPages(claim, player.uniqueId)
                 if (session.addPlayerPage + 1 < totalPages) {
                     session.addPlayerPage += 1
                     openScreen(player, session)
@@ -170,7 +182,14 @@ class ClaimManagementUiService(
             }
 
             in WHITELIST_CONTENT_SLOTS -> {
-                val selectedPlayer = addableEntries(session.claimId, player.uniqueId)
+                val claim = claimRepository.findById(session.claimId)?.toOwnedClaim()
+                    ?: run {
+                        clearSession(player)
+                        player.closeInventory()
+                        player.sendMessage(ChatMessages.plain("Claim management closed."))
+                        return
+                    }
+                val selectedPlayer = addableEntries(claim, player.uniqueId)
                     .drop(session.addPlayerPage * WHITELIST_PAGE_SIZE)
                     .take(WHITELIST_PAGE_SIZE)
                     .getOrNull(contentIndexFor(rawSlot))
@@ -179,7 +198,7 @@ class ClaimManagementUiService(
                 when (val result = claimCommandService.whitelist(player, selectedPlayer.playerName)) {
                     is ClaimCommandResult.Whitelisted -> {
                         player.sendMessage(ChatMessages.whitelistUpdated(result.playerName, added = true))
-                        clampAddPlayerPage(session, player.uniqueId)
+                        clampAddPlayerPage(session, claim, player.uniqueId)
                         openScreen(player, session)
                     }
 
@@ -309,7 +328,7 @@ class ClaimManagementUiService(
             ClaimManagementScreenId.ROOT -> createRootInventory()
             ClaimManagementScreenId.ATTRIBUTES -> createAttributesInventory(session.claimId)
             ClaimManagementScreenId.WHITELIST -> createWhitelistInventory(session)
-            ClaimManagementScreenId.ADD_WHITELIST_PLAYER -> createAddWhitelistPlayerInventory(session, player.uniqueId)
+            ClaimManagementScreenId.ADD_WHITELIST_PLAYER -> createAddWhitelistPlayerInventory(session, player)
             ClaimManagementScreenId.MANAGE_WHITELISTED_PLAYER -> createManageWhitelistedPlayerInventory(session)
         }
         player.openInventory(inventory)
@@ -346,6 +365,12 @@ class ClaimManagementUiService(
             toggleButton(claim.attributes.allowPvp),
         )
 
+        inventory.setItem(SLOT_ALLOW_FIRE_SPREAD_LABEL, staticLabel(uiConfig.allowFireSpreadLabel))
+        inventory.setItem(
+            SLOT_ALLOW_FIRE_SPREAD_TOGGLE,
+            toggleButton(claim.attributes.allowFireSpread),
+        )
+
         inventory.setItem(SLOT_BACK, button(uiConfig.back))
         inventory.setItem(SLOT_CLOSE, button(uiConfig.close))
         return inventory
@@ -373,14 +398,16 @@ class ClaimManagementUiService(
         return inventory
     }
 
-    private fun createAddWhitelistPlayerInventory(session: ClaimManagementSession, ownerUuid: UUID): Inventory {
-        clampAddPlayerPage(session, ownerUuid)
+    private fun createAddWhitelistPlayerInventory(session: ClaimManagementSession, player: Player): Inventory {
+        val claim = claimRepository.findById(session.claimId)?.toOwnedClaim()
+            ?: error("Add whitelist player screen requested without a valid claim.")
+        clampAddPlayerPage(session, claim, player.uniqueId)
 
         val holder = ClaimManagementInventoryHolder(ClaimManagementScreenId.ADD_WHITELIST_PLAYER)
         val inventory = Bukkit.createInventory(holder, FULL_CHEST_SIZE, "Add Whitelisted Player")
         holder.attach(inventory)
 
-        val entries = addableEntries(session.claimId, ownerUuid)
+        val entries = addableEntries(claim, player.uniqueId)
         val pageEntries = entries
             .drop(session.addPlayerPage * WHITELIST_PAGE_SIZE)
             .take(WHITELIST_PAGE_SIZE)
@@ -425,7 +452,7 @@ class ClaimManagementUiService(
 
     private fun ensureValidContext(player: Player, session: ClaimManagementSession): Boolean {
         val claim = claimRepository.findById(session.claimId)?.toOwnedClaim()
-        if (claim == null || claim.ownerUuid != player.uniqueId || !claim.contains(player.location.blockX, player.location.blockZ)) {
+        if (claim == null || !claim.isOwnedBy(player.uniqueId, player.isOp) || !claim.contains(player.location.blockX, player.location.blockZ)) {
             clearSession(player)
             player.closeInventory()
             player.sendMessage(ChatMessages.plain("Claim management closed."))
@@ -447,13 +474,14 @@ class ClaimManagementUiService(
             .sortedBy { it.playerName.lowercase() }
     }
 
-    private fun addableEntries(claimId: Long, ownerUuid: UUID): List<WhitelistedEntry> {
-        val whitelistedUuids = claimPermissionRepository.listByClaimId(claimId)
+    private fun addableEntries(claim: place.block.landclaim.claim.OwnedClaim, viewerUuid: UUID): List<WhitelistedEntry> {
+        val whitelistedUuids = claimPermissionRepository.listByClaimId(claim.id.value)
             .mapTo(mutableSetOf()) { it.playerUuid }
 
         return server.onlinePlayers
             .asSequence()
-            .filter { onlinePlayer -> onlinePlayer.uniqueId != ownerUuid }
+            .filter { onlinePlayer -> onlinePlayer.uniqueId != viewerUuid }
+            .filter { onlinePlayer -> !claim.isAdminClaim() || !onlinePlayer.isOp }
             .filter { onlinePlayer -> onlinePlayer.uniqueId !in whitelistedUuids }
             .map { onlinePlayer ->
                 WhitelistedEntry(
@@ -470,13 +498,13 @@ class ClaimManagementUiService(
         return maxOf(1, (totalEntries + WHITELIST_PAGE_SIZE - 1) / WHITELIST_PAGE_SIZE)
     }
 
-    private fun addPlayerTotalPages(claimId: Long, ownerUuid: UUID): Int {
-        val totalEntries = addableEntries(claimId, ownerUuid).size
+    private fun addPlayerTotalPages(claim: place.block.landclaim.claim.OwnedClaim, viewerUuid: UUID): Int {
+        val totalEntries = addableEntries(claim, viewerUuid).size
         return maxOf(1, (totalEntries + WHITELIST_PAGE_SIZE - 1) / WHITELIST_PAGE_SIZE)
     }
 
-    private fun clampAddPlayerPage(session: ClaimManagementSession, ownerUuid: UUID) {
-        val totalPages = addPlayerTotalPages(session.claimId, ownerUuid)
+    private fun clampAddPlayerPage(session: ClaimManagementSession, claim: place.block.landclaim.claim.OwnedClaim, viewerUuid: UUID) {
+        val totalPages = addPlayerTotalPages(claim, viewerUuid)
         session.addPlayerPage = session.addPlayerPage.coerceIn(0, totalPages - 1)
     }
 
@@ -565,6 +593,7 @@ class ClaimManagementUiService(
         val nextValue = when (attribute) {
             ClaimAttributeFlag.ALLOW_EXPLOSIONS -> !claim.attributes.allowExplosions
             ClaimAttributeFlag.ALLOW_PVP -> !claim.attributes.allowPvp
+            ClaimAttributeFlag.ALLOW_FIRE_SPREAD -> !claim.attributes.allowFireSpread
         }
 
         when (val result = claimCommandService.setAttribute(player, attribute, nextValue)) {
@@ -635,9 +664,11 @@ class ClaimManagementUiService(
         const val SLOT_FULL_NEXT_PAGE = 52
         const val SLOT_FULL_CLOSE = 53
         const val SLOT_ALLOW_EXPLOSIONS_LABEL = 3
-        const val SLOT_ALLOW_PVP_LABEL = 5
+        const val SLOT_ALLOW_PVP_LABEL = 4
+        const val SLOT_ALLOW_FIRE_SPREAD_LABEL = 5
         const val SLOT_ALLOW_EXPLOSIONS_TOGGLE = 12
-        const val SLOT_ALLOW_PVP_TOGGLE = 14
+        const val SLOT_ALLOW_PVP_TOGGLE = 13
+        const val SLOT_ALLOW_FIRE_SPREAD_TOGGLE = 14
         const val SLOT_MANAGE_PLAYER_HEAD = 0
         const val SLOT_BLOCK_MUTATION_LABEL = 3
         const val SLOT_BLOCK_USE_LABEL = 4

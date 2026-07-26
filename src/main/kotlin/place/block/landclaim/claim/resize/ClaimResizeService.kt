@@ -4,6 +4,7 @@ import org.bukkit.Server
 import org.bukkit.block.Block
 import org.bukkit.entity.Player
 import java.util.logging.Logger
+import place.block.landclaim.claim.ClaimOwnerType
 import place.block.landclaim.claim.ClaimValidationResult
 import place.block.landclaim.claim.ClaimValidator
 import place.block.landclaim.claim.budget.ClaimBlockBudgetService
@@ -25,6 +26,7 @@ class ClaimResizeService(
     fun beginResize(player: Player, clickedBlock: Block): ClaimResizeResult? {
         val selection = ownedClaimCornerResolver.findOwnedCorner(
             playerUuid = player.uniqueId,
+            isOp = player.isOp,
             clickedCorner = clickedBlock.toClaimCorner(),
         ) ?: return null
 
@@ -49,7 +51,7 @@ class ClaimResizeService(
         if (containingClaim != null && containingClaim.id != session.claimId.value) {
             return ClaimResizeResult.SelectionRejected(
                 corner = clickedCorner,
-                ownerName = resolvePlayerName(containingClaim.ownerUuid),
+                ownerName = resolveOwnerName(containingClaim.ownerType, containingClaim.ownerUuid),
             )
         }
 
@@ -60,6 +62,7 @@ class ClaimResizeService(
                 currentArea = currentClaim.area,
                 movedCorner = clickedCorner,
                 fixedCorner = session.fixedCorner,
+                enforceOwnerLimits = currentClaim.ownerType != ClaimOwnerType.ADMIN,
             )
         ) {
             is ClaimValidationResult.Success -> {
@@ -106,7 +109,7 @@ class ClaimResizeService(
                 val firstOverlap = validation.overlappingClaims.first()
                 ClaimResizeResult.ClaimOverlapsExisting(
                     area = validation.area,
-                    ownerName = resolvePlayerName(firstOverlap.ownerUuid),
+                    ownerName = resolveOwnerName(firstOverlap.ownerType, firstOverlap.ownerUuid),
                     overlappingArea = firstOverlap.area,
                 )
             }
@@ -117,7 +120,10 @@ class ClaimResizeService(
         }
     }
 
-    private fun resolvePlayerName(playerUuid: java.util.UUID): String {
-        return server.getOfflinePlayer(playerUuid).name ?: playerUuid.toString()
+    private fun resolveOwnerName(ownerType: ClaimOwnerType, playerUuid: java.util.UUID): String {
+        return when (ownerType) {
+            ClaimOwnerType.ADMIN -> "Server"
+            ClaimOwnerType.PLAYER -> server.getOfflinePlayer(playerUuid).name ?: playerUuid.toString()
+        }
     }
 }

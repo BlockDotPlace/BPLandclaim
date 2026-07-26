@@ -66,6 +66,7 @@ class ClaimValidator(
         currentArea: ClaimArea,
         movedCorner: ClaimCorner,
         fixedCorner: ClaimCorner,
+        enforceOwnerLimits: Boolean = true,
     ): ClaimValidationResult {
         val area = movedCorner.toAreaWith(fixedCorner)
         val additionalBlocks = (area.blockCount - currentArea.blockCount).coerceAtLeast(0)
@@ -75,6 +76,7 @@ class ClaimValidator(
             ignoredClaimId = claimId,
             enforceClaimLimit = false,
             additionalBlocks = additionalBlocks,
+            enforceOwnerLimits = enforceOwnerLimits,
         )
     }
 
@@ -84,6 +86,7 @@ class ClaimValidator(
         ignoredClaimId: ClaimId?,
         enforceClaimLimit: Boolean,
         additionalBlocks: Int = area.blockCount,
+        enforceOwnerLimits: Boolean = true,
     ): ClaimValidationResult {
         val maxClaimsPerPlayer = this.maxClaimsPerPlayer
         val maxClaimWidth = this.maxClaimWidth
@@ -109,7 +112,7 @@ class ClaimValidator(
             )
         }
 
-        if (maxClaimWidth != null && area.width > maxClaimWidth) {
+        if (enforceOwnerLimits && maxClaimWidth != null && area.width > maxClaimWidth) {
             return ClaimValidationResult.ClaimExceedsLimit(
                 limitType = ClaimSizeLimitType.WIDTH,
                 actualValue = area.width,
@@ -117,7 +120,7 @@ class ClaimValidator(
             )
         }
 
-        if (maxClaimDepth != null && area.depth > maxClaimDepth) {
+        if (enforceOwnerLimits && maxClaimDepth != null && area.depth > maxClaimDepth) {
             return ClaimValidationResult.ClaimExceedsLimit(
                 limitType = ClaimSizeLimitType.DEPTH,
                 actualValue = area.depth,
@@ -126,7 +129,7 @@ class ClaimValidator(
         }
 
         val areaSize = area.width * area.depth
-        if (maxClaimArea != null && areaSize > maxClaimArea) {
+        if (enforceOwnerLimits && maxClaimArea != null && areaSize > maxClaimArea) {
             return ClaimValidationResult.ClaimExceedsLimit(
                 limitType = ClaimSizeLimitType.AREA,
                 actualValue = areaSize,
@@ -134,15 +137,17 @@ class ClaimValidator(
             )
         }
 
-        when (val budgetCheck = claimBlockBudgetService.validateAdditionalUsage(ownerUuid, additionalBlocks)) {
-            ClaimBlockBudgetCheckResult.Allowed -> Unit
-            is ClaimBlockBudgetCheckResult.Exceeded -> {
-                return ClaimValidationResult.ClaimBlockBudgetExceeded(
-                    requiredAdditionalBlocks = budgetCheck.requiredAdditionalBlocks,
-                    availableBlocks = budgetCheck.availableBlocks,
-                    usedBlocks = budgetCheck.usedBlocks,
-                    remainingBlocks = budgetCheck.remainingBlocks,
-                )
+        if (enforceOwnerLimits) {
+            when (val budgetCheck = claimBlockBudgetService.validateAdditionalUsage(ownerUuid, additionalBlocks)) {
+                ClaimBlockBudgetCheckResult.Allowed -> Unit
+                is ClaimBlockBudgetCheckResult.Exceeded -> {
+                    return ClaimValidationResult.ClaimBlockBudgetExceeded(
+                        requiredAdditionalBlocks = budgetCheck.requiredAdditionalBlocks,
+                        availableBlocks = budgetCheck.availableBlocks,
+                        usedBlocks = budgetCheck.usedBlocks,
+                        remainingBlocks = budgetCheck.remainingBlocks,
+                    )
+                }
             }
         }
 

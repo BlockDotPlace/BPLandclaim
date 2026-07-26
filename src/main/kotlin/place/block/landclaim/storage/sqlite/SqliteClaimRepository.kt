@@ -1,5 +1,6 @@
 package place.block.landclaim.storage.sqlite
 
+import place.block.landclaim.claim.ClaimOwnerType
 import place.block.landclaim.storage.ClaimRecord
 import place.block.landclaim.storage.DatabaseManager
 import place.block.landclaim.storage.repository.ClaimRepository
@@ -20,8 +21,8 @@ class SqliteClaimRepository(
     ): ClaimRecord {
         val sql =
             """
-            INSERT INTO claims (world_id, owner_uuid, min_x, max_x, min_z, max_z, allow_explosions, allow_pvp, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO claims (world_id, owner_uuid, owner_type, min_x, max_x, min_z, max_z, allow_explosions, allow_pvp, allow_fire_spread, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent()
 
         return databaseManager.connection().use { connection ->
@@ -29,13 +30,15 @@ class SqliteClaimRepository(
                 val createdAt = Instant.now()
                 statement.setString(1, worldId)
                 statement.setString(2, ownerUuid.toString())
-                statement.setInt(3, minX)
-                statement.setInt(4, maxX)
-                statement.setInt(5, minZ)
-                statement.setInt(6, maxZ)
-                statement.setBoolean(7, true)
+                statement.setString(3, ClaimOwnerType.PLAYER.name)
+                statement.setInt(4, minX)
+                statement.setInt(5, maxX)
+                statement.setInt(6, minZ)
+                statement.setInt(7, maxZ)
                 statement.setBoolean(8, true)
-                statement.setString(9, createdAt.toString())
+                statement.setBoolean(9, true)
+                statement.setBoolean(10, true)
+                statement.setString(11, createdAt.toString())
                 statement.executeUpdate()
 
                 val claimId = statement.generatedKeys.use { generatedKeys ->
@@ -47,12 +50,14 @@ class SqliteClaimRepository(
                     id = claimId,
                     worldId = worldId,
                     ownerUuid = ownerUuid,
+                    ownerType = ClaimOwnerType.PLAYER,
                     minX = minX,
                     maxX = maxX,
                     minZ = minZ,
                     maxZ = maxZ,
                     allowExplosions = true,
                     allowPvp = true,
+                    allowFireSpread = true,
                     createdAt = createdAt,
                 )
             }
@@ -79,11 +84,16 @@ class SqliteClaimRepository(
         }
     }
 
-    override fun updateAttributes(claimId: Long, allowExplosions: Boolean, allowPvp: Boolean): Boolean {
+    override fun updateAttributes(
+        claimId: Long,
+        allowExplosions: Boolean,
+        allowPvp: Boolean,
+        allowFireSpread: Boolean,
+    ): Boolean {
         val sql =
             """
             UPDATE claims
-            SET allow_explosions = ?, allow_pvp = ?
+            SET allow_explosions = ?, allow_pvp = ?, allow_fire_spread = ?
             WHERE id = ?
             """.trimIndent()
 
@@ -91,6 +101,29 @@ class SqliteClaimRepository(
             connection.prepareStatement(sql).use { statement ->
                 statement.setBoolean(1, allowExplosions)
                 statement.setBoolean(2, allowPvp)
+                statement.setBoolean(3, allowFireSpread)
+                statement.setLong(4, claimId)
+                statement.executeUpdate() > 0
+            }
+        }
+    }
+
+    override fun updateOwnership(
+        claimId: Long,
+        ownerUuid: UUID,
+        ownerType: ClaimOwnerType,
+    ): Boolean {
+        val sql =
+            """
+            UPDATE claims
+            SET owner_uuid = ?, owner_type = ?
+            WHERE id = ?
+            """.trimIndent()
+
+        return databaseManager.connection().use { connection ->
+            connection.prepareStatement(sql).use { statement ->
+                statement.setString(1, ownerUuid.toString())
+                statement.setString(2, ownerType.name)
                 statement.setLong(3, claimId)
                 statement.executeUpdate() > 0
             }
@@ -108,7 +141,7 @@ class SqliteClaimRepository(
     }
 
     override fun countByOwner(ownerUuid: UUID): Int {
-        val sql = "SELECT COUNT(*) FROM claims WHERE owner_uuid = ?"
+        val sql = "SELECT COUNT(*) FROM claims WHERE owner_uuid = ? AND owner_type = 'PLAYER'"
         return databaseManager.connection().use { connection ->
             connection.prepareStatement(sql).use { statement ->
                 statement.setString(1, ownerUuid.toString())
@@ -126,6 +159,7 @@ class SqliteClaimRepository(
             SELECT COALESCE(SUM(((max_x - min_x) + 1) * ((max_z - min_z) + 1)), 0)
             FROM claims
             WHERE owner_uuid = ?
+              AND owner_type = 'PLAYER'
             """.trimIndent()
 
         return databaseManager.connection().use { connection ->
@@ -142,7 +176,7 @@ class SqliteClaimRepository(
     override fun findAll(): List<ClaimRecord> {
         val sql =
             """
-            SELECT id, world_id, owner_uuid, min_x, max_x, min_z, max_z, allow_explosions, allow_pvp, created_at
+            SELECT id, world_id, owner_uuid, owner_type, min_x, max_x, min_z, max_z, allow_explosions, allow_pvp, allow_fire_spread, created_at
             FROM claims
             ORDER BY id
             """.trimIndent()
@@ -153,7 +187,7 @@ class SqliteClaimRepository(
     override fun findContaining(worldId: String, x: Int, z: Int): ClaimRecord? {
         val sql =
             """
-            SELECT id, world_id, owner_uuid, min_x, max_x, min_z, max_z, allow_explosions, allow_pvp, created_at
+            SELECT id, world_id, owner_uuid, owner_type, min_x, max_x, min_z, max_z, allow_explosions, allow_pvp, allow_fire_spread, created_at
             FROM claims
             WHERE world_id = ?
               AND ? BETWEEN min_x AND max_x
@@ -171,7 +205,7 @@ class SqliteClaimRepository(
     override fun findById(claimId: Long): ClaimRecord? {
         val sql =
             """
-            SELECT id, world_id, owner_uuid, min_x, max_x, min_z, max_z, allow_explosions, allow_pvp, created_at
+            SELECT id, world_id, owner_uuid, owner_type, min_x, max_x, min_z, max_z, allow_explosions, allow_pvp, allow_fire_spread, created_at
             FROM claims
             WHERE id = ?
             """.trimIndent()
@@ -184,7 +218,7 @@ class SqliteClaimRepository(
     override fun findNear(worldId: String, x: Int, z: Int, radius: Int): List<ClaimRecord> {
         val sql =
             """
-            SELECT id, world_id, owner_uuid, min_x, max_x, min_z, max_z, allow_explosions, allow_pvp, created_at
+            SELECT id, world_id, owner_uuid, owner_type, min_x, max_x, min_z, max_z, allow_explosions, allow_pvp, allow_fire_spread, created_at
             FROM claims
             WHERE world_id = ?
               AND max_x >= ?
@@ -214,7 +248,7 @@ class SqliteClaimRepository(
         val ignoredClause = if (ignoredClaimId != null) "AND id <> ?" else ""
         val sql =
             """
-            SELECT id, world_id, owner_uuid, min_x, max_x, min_z, max_z, allow_explosions, allow_pvp, created_at
+            SELECT id, world_id, owner_uuid, owner_type, min_x, max_x, min_z, max_z, allow_explosions, allow_pvp, allow_fire_spread, created_at
             FROM claims
             WHERE world_id = ?
               AND min_x <= ?
@@ -275,12 +309,14 @@ private fun java.sql.ResultSet.toClaimRecord(): ClaimRecord {
         id = getLong("id"),
         worldId = getString("world_id"),
         ownerUuid = UUID.fromString(getString("owner_uuid")),
+        ownerType = ClaimOwnerType.valueOf(getString("owner_type")),
         minX = getInt("min_x"),
         maxX = getInt("max_x"),
         minZ = getInt("min_z"),
         maxZ = getInt("max_z"),
         allowExplosions = getBoolean("allow_explosions"),
         allowPvp = getBoolean("allow_pvp"),
+        allowFireSpread = getBoolean("allow_fire_spread"),
         createdAt = Instant.parse(getString("created_at")),
     )
 }

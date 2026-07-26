@@ -106,6 +106,7 @@ private fun FileConfiguration.requireClaimManagementUiConfig(
         removeFromWhitelist = item("remove_from_whitelist"),
         allowExplosionsLabel = item("allow_explosions_label"),
         allowPvpLabel = item("allow_pvp_label"),
+        allowFireSpreadLabel = item("allow_fire_spread_label"),
         blockMutationLabel = item("block_mutation_label"),
         blockUseLabel = item("block_use_label"),
         entityDamageLabel = item("entity_damage_label"),

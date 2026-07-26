@@ -1,5 +1,6 @@
 package place.block.landclaim.storage.repository
 
+import place.block.landclaim.claim.ClaimOwnerType
 import place.block.landclaim.storage.ClaimRecord
 import java.util.UUID
 
@@ -25,6 +26,13 @@ interface ClaimRepository {
         claimId: Long,
         allowExplosions: Boolean,
         allowPvp: Boolean,
+        allowFireSpread: Boolean,
+    ): Boolean
+
+    fun updateOwnership(
+        claimId: Long,
+        ownerUuid: UUID,
+        ownerType: ClaimOwnerType,
     ): Boolean
 
     fun delete(claimId: Long): Boolean

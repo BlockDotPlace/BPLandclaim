@@ -3,6 +3,7 @@ package place.block.landclaim.command
 enum class ClaimAttributeFlag {
     ALLOW_EXPLOSIONS,
     ALLOW_PVP,
+    ALLOW_FIRE_SPREAD,
     ;
 
     companion object {

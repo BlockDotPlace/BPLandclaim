@@ -23,13 +23,14 @@ attempt broad causality tracking for every grief vector in Minecraft.
 | Claim creation | Two right-clicks with the configured claim tool create a claim immediately if valid. |
 | Claim resizing | Right-click an exact existing corner, then right-click a new corner to move it. |
 | Claim deletion | Owners can delete the claim they are standing in. |
-| Claim protection | Block break, block place, block use, protected entity damage, explosion protection, and PvP rules are enforced from claim context. |
+| Claim protection | Block break, block place, block use, protected entity damage, explosion protection, PvP rules, fire spread, and liquid ingress rules are enforced from claim context. |
 | Whitelist permissions | Owners can grant per-player `block_mutation`, `block_use`, and `entity_damage`. |
-| Claim attributes | Owners can toggle claim-wide `allow_explosions` and `allow_pvp`. |
+| Claim attributes | Owners can toggle claim-wide `allow_explosions`, `allow_pvp`, and `allow_fire_spread`. |
 | Claim budgets | Total claim area is tied to playtime through config-driven claim block tiers. |
 | Claim limits | Max claim count and optional width, depth, and area limits are config-driven. |
 | Claim visualization | Boundary overlays appear client-side while holding the claim tool. |
 | Claim management UI | `/claim manage` opens owner UI screens for claim attributes and whitelist management. |
+| Admin claims | Ops can convert a normal claim into a server-owned admin claim that all ops can manage. |
 | Config reload | `/claim reload` hot-reloads all current config-driven systems without full server restart. |
 | Manual culling | Admins can preview and confirm claim deletion based on owner playtime hours. |
 
@@ -77,10 +78,11 @@ Permission:
 | `/claim delete` | Claim owners | Deletes the owned claim the player is standing in. | Command-only flow. |
 | `/claim cancel` | Players | Cancels active claim creation or resize state. | Clears the active claim HUD. |
 | `/claim manage` | Claim owners | Opens the claim management UI for the owned claim the player is standing in. | UI entry point for attribute and whitelist management. |
+| `/claim admin <on\|off>` | Ops | Converts the current claim between player-owned and server-owned admin claim state. | Must be run while standing in a claim the op is allowed to manage. |
 | `/claim whitelist <player>` | Claim owners | Adds a player to the current claim whitelist. | Command-backed; UI add-player screen wraps this. |
 | `/claim unwhitelist <player>` | Claim owners | Removes a player from the current claim whitelist. | Command-backed; UI removal wraps this. |
 | `/claim perms <player> <permission> <true\|false>` | Claim owners | Sets one whitelist permission for one player. | Command-backed; UI permission toggles wrap this. |
-| `/claim attr <allow_explosions\|allow_pvp> <true\|false>` | Claim owners | Sets one claim-wide attribute. | Command-backed; UI attribute toggles wrap this. |
+| `/claim attr <allow_explosions\|allow_pvp\|allow_fire_spread> <true\|false>` | Claim owners | Sets one claim-wide attribute. | Command-backed; UI attribute toggles wrap this. |
 | `/claim cull <hours> preview` | Admins | Scans claims and reports how many would be deleted. | Requires `landclaim.admin.cull`. |
 | `/claim cull <hours> confirm` | Admins | Deletes claims whose owners have `<=` the provided played hours. | Requires `landclaim.admin.cull`. |
 | `/claim reload` | Admins | Reloads the plugin config and hot-applies current config-driven systems. | Requires `landclaim.admin.reload`. |
@@ -101,6 +103,7 @@ Claim-wide attributes:
 | --- | --- |
 | `allow_explosions` | If `false`, explosion damage to both blocks and entities is prevented inside the claim. |
 | `allow_pvp` | If `false`, player-driven PvP against victims inside the claim is prevented. |
+| `allow_fire_spread` | If `false`, fire cannot spread into the claim from outside it. Fire already inside the same claim may continue to propagate normally. |
 
 ## Player Flows
 
@@ -129,7 +132,7 @@ Claim-wide attributes:
 | Screen | Entry | Purpose |
 | --- | --- | --- |
 | Claim Management | `/claim manage` | Root screen for owner claim controls. |
-| Claim Attributes | Root screen button | Toggle `allow_explosions` and `allow_pvp`. |
+| Claim Attributes | Root screen button | Toggle `allow_explosions`, `allow_pvp`, and `allow_fire_spread`. |
 | Whitelist Management | Root screen button | Browse currently whitelisted players. |
 | Add Whitelisted Player | Whitelist screen button | Add online non-whitelisted players. |
 | Manage Whitelisted Player | Click a whitelisted player head | Toggle permissions or remove that player. |
@@ -167,11 +170,46 @@ Current protection coverage:
 - protected entity damage by players
 - explosion damage inside claims when disabled
 - player-driven PvP against victims inside claims when disabled
+- fire spread into claims when disabled on that claim
+- water and lava flowing into claims from outside
 
 Protected entity rule:
 
 - any passive mob
 - any mob with a nametag
+
+Fire and liquid boundary behavior:
+
+- `allow_fire_spread = false` blocks fire crossing from outside a claim into that claim
+- fire already inside the same claim can continue to spread inside that claim
+- water and lava flowing from outside a claim into that claim are always blocked
+- water and lava already originating inside the same claim can continue to flow inside that claim
+
+## Admin Claims
+
+Admin claims are server-managed claims intended for spawn, event spaces, and
+other shared protected regions.
+
+Behavior:
+
+- an op creates a claim normally, then runs `/claim admin on` while standing in it
+- the claim owner display becomes `Server`
+- all ops are treated as owners for access, resizing, deletion, attribute changes, whitelist management, and UI access
+- non-op players still follow normal claim and whitelist rules inside the admin claim
+- running `/claim admin off` converts the claim back to a normal player claim owned by the op who ran the command
+
+Administrative rules:
+
+- admin claims do not count toward player plot count limits
+- admin claims do not consume player claim block budgets
+- admin claims are ignored by manual culling
+- existing whitelist entries and claim attributes remain intact during conversion
+
+Recommended admin flow:
+
+1. Create the protected area like a normal claim.
+2. Stand inside it and run `/claim admin on`.
+3. Use `/claim manage` or the existing commands to configure attributes and whitelist state.
 
 ## Manual Culling
 

@@ -47,6 +47,9 @@ claim_management_ui:
     allow_pvp_label:
       material: minecraft:iron_sword
       name: Allow PvP
+    allow_fire_spread_label:
+      material: minecraft:flint_and_steel
+      name: Allow Fire Spread
     block_mutation_label:
       material: minecraft:iron_pickaxe
       name: Block Mutation

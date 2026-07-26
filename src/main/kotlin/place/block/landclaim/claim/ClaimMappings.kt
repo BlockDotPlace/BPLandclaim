@@ -6,6 +6,7 @@ fun ClaimRecord.toOwnedClaim(): OwnedClaim {
     return OwnedClaim(
         id = ClaimId(id),
         ownerUuid = ownerUuid,
+        ownerType = ownerType,
         area = ClaimArea(
             worldId = worldId,
             minX = minX,
@@ -16,6 +17,7 @@ fun ClaimRecord.toOwnedClaim(): OwnedClaim {
         attributes = ClaimAttributes(
             allowExplosions = allowExplosions,
             allowPvp = allowPvp,
+            allowFireSpread = allowFireSpread,
         ),
         createdAt = createdAt,
     )

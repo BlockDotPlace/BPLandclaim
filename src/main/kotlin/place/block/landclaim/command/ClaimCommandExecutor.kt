@@ -40,7 +40,7 @@ class ClaimCommandExecutor(
 
         val result = when (args.firstOrNull()?.lowercase()) {
             null, "", "help" -> ClaimCommandResult.Usage(
-                "Usage: /claim <info|blocks|delete|cancel|whitelist|unwhitelist|perms|attr|manage|reload|cull>",
+                "Usage: /claim <info|blocks|delete|cancel|whitelist|unwhitelist|perms|attr|manage|admin|reload|cull>",
             )
 
             "info" -> claimCommandService.info(player)
@@ -54,6 +54,17 @@ class ClaimCommandExecutor(
                 } else {
                     claimManagementUiService.openRoot(player, claimIdAtPlayer(player))
                     ClaimCommandResult.ManageOpened
+                }
+            }
+            "admin" -> {
+                if (!player.isOp) {
+                    ClaimCommandResult.AdminClaimRequiresAdmin
+                } else {
+                    when (args.getOrNull(1)?.lowercase()) {
+                        "on" -> claimCommandService.setAdminClaim(player, enabled = true)
+                        "off" -> claimCommandService.setAdminClaim(player, enabled = false)
+                        else -> return send(player, listOf(ChatMessages.usage("Usage: /claim admin <on|off>")))
+                    }
                 }
             }
             "whitelist" -> {
@@ -80,14 +91,14 @@ class ClaimCommandExecutor(
 
             "attr" -> {
                 val attribute = args.getOrNull(1)?.let(ClaimAttributeFlag::parse)
-                    ?: return send(player, listOf(ChatMessages.usage("Usage: /claim attr <allow_explosions|allow_pvp> <true|false>")))
+                    ?: return send(player, listOf(ChatMessages.usage("Usage: /claim attr <allow_explosions|allow_pvp|allow_fire_spread> <true|false>")))
                 val value = args.getOrNull(2)?.toBooleanStrictOrNull()
                     ?: return send(player, format(ClaimCommandResult.InvalidPermissionValue("Invalid value: use true or false.")))
                 claimCommandService.setAttribute(player, attribute, value)
             }
 
             else -> ClaimCommandResult.UnknownSubcommand(
-                "Unknown subcommand. Use /claim <info|blocks|delete|cancel|whitelist|unwhitelist|perms|attr|manage|reload|cull>.",
+                "Unknown subcommand. Use /claim <info|blocks|delete|cancel|whitelist|unwhitelist|perms|attr|manage|admin|reload|cull>.",
             )
         }
 
@@ -105,13 +116,17 @@ class ClaimCommandExecutor(
         args: Array<out String>,
     ): List<String> {
         return when (args.size) {
-            1 -> listOf("info", "blocks", "delete", "cancel", "whitelist", "unwhitelist", "perms", "attr", "manage", "cull")
+            1 -> listOf("info", "blocks", "delete", "cancel", "whitelist", "unwhitelist", "perms", "attr", "manage", "admin", "cull")
                 .plus("reload")
                 .filter { it.startsWith(args[0], ignoreCase = true) }
 
             2 -> when {
                 args.getOrNull(0).equals("attr", ignoreCase = true) ->
-                    listOf("allow_explosions", "allow_pvp")
+                    listOf("allow_explosions", "allow_pvp", "allow_fire_spread")
+                        .filter { it.startsWith(args[1], ignoreCase = true) }
+
+                args.getOrNull(0).equals("admin", ignoreCase = true) ->
+                    listOf("on", "off")
                         .filter { it.startsWith(args[1], ignoreCase = true) }
 
                 else -> emptyList()
@@ -157,6 +172,7 @@ class ClaimCommandExecutor(
                 result.selfEntityDamage,
                 result.claim.attributes.allowExplosions,
                 result.claim.attributes.allowPvp,
+                result.claim.attributes.allowFireSpread,
             )
 
             is ClaimCommandResult.ClaimBlocks -> ChatMessages.claimBlocksLines(
@@ -200,6 +216,9 @@ class ClaimCommandExecutor(
             is ClaimCommandResult.AttributeUpdated ->
                 listOf(ChatMessages.attributeUpdated(result.attribute.name, result.value))
 
+            is ClaimCommandResult.AdminClaimUpdated ->
+                listOf(ChatMessages.adminClaimUpdated(result.enabled))
+
             is ClaimCommandResult.CullPreview ->
                 ChatMessages.cullPreview(result.thresholdHours, result.scannedClaims, result.matchingClaims)
 
@@ -226,6 +245,7 @@ class ClaimCommandExecutor(
             is ClaimCommandResult.CullingRequiresAdmin -> listOf(ChatMessages.cullingRequiresAdmin())
             is ClaimCommandResult.ReloadFailed -> listOf(ChatMessages.reloadFailed(result.message))
             is ClaimCommandResult.ReloadRequiresAdmin -> listOf(ChatMessages.reloadRequiresAdmin())
+            is ClaimCommandResult.AdminClaimRequiresAdmin -> listOf(ChatMessages.adminClaimRequiresAdmin())
         }
     }
 

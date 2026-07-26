@@ -5,6 +5,8 @@ import org.bukkit.block.Block
 import org.bukkit.entity.Entity
 import org.bukkit.Location
 import org.bukkit.entity.Player
+import org.bukkit.Material
+import place.block.landclaim.claim.ClaimOwnerType
 import place.block.landclaim.claim.toOwnedClaim
 import place.block.landclaim.storage.repository.ClaimPermissionRepository
 import place.block.landclaim.storage.repository.ClaimRepository
@@ -33,9 +35,30 @@ class ClaimAccessService(
         return claim.attributes.allowPvp
     }
 
+    fun isFireSpreadAllowed(source: Location, destination: Location): Boolean {
+        val destinationClaim = findClaim(destination) ?: return true
+        if (destinationClaim.attributes.allowFireSpread) {
+            return true
+        }
+
+        val sourceClaim = findClaim(source)
+        return sourceClaim?.id == destinationClaim.id
+    }
+
+    fun isLiquidFlowAllowed(source: Location, destination: Location, material: Material): Boolean {
+        val destinationClaim = findClaim(destination) ?: return true
+
+        if (!isWater(material) && !isLava(material)) {
+            return true
+        }
+
+        val sourceClaim = findClaim(source)
+        return sourceClaim?.id == destinationClaim.id
+    }
+
     fun claimOwnerNameAt(location: Location): String? {
         val claim = findClaim(location) ?: return null
-        return ownerName(claim.ownerUuid)
+        return ownerName(claim.ownerType, claim.ownerUuid)
     }
 
     private fun canAccess(
@@ -51,7 +74,7 @@ class ClaimAccessService(
             z = z,
         )?.toOwnedClaim() ?: return ClaimAccessResult.Allowed
 
-        if (claim.ownerUuid == player.uniqueId) {
+        if (claim.isOwnedBy(player.uniqueId, player.isOp)) {
             return ClaimAccessResult.Allowed
         }
 
@@ -70,7 +93,7 @@ class ClaimAccessService(
             return ClaimAccessResult.Allowed
         }
 
-        val ownerName = ownerName(claim.ownerUuid)
+        val ownerName = ownerName(claim.ownerType, claim.ownerUuid)
         return ClaimAccessResult.Denied(claim = claim, ownerName = ownerName)
     }
 
@@ -80,7 +103,14 @@ class ClaimAccessService(
         z = location.blockZ,
     )?.toOwnedClaim()
 
-    private fun ownerName(ownerUuid: java.util.UUID): String {
-        return server.getOfflinePlayer(ownerUuid).name ?: ownerUuid.toString()
+    private fun ownerName(ownerType: ClaimOwnerType, ownerUuid: java.util.UUID): String {
+        return when (ownerType) {
+            ClaimOwnerType.ADMIN -> "Server"
+            ClaimOwnerType.PLAYER -> server.getOfflinePlayer(ownerUuid).name ?: ownerUuid.toString()
+        }
     }
+
+    private fun isWater(material: Material): Boolean = material == Material.WATER
+
+    private fun isLava(material: Material): Boolean = material == Material.LAVA
 }

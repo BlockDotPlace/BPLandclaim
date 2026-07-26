@@ -13,6 +13,7 @@ data class ClaimManagementUiConfig(
     val removeFromWhitelist: UiItemConfig,
     val allowExplosionsLabel: UiItemConfig,
     val allowPvpLabel: UiItemConfig,
+    val allowFireSpreadLabel: UiItemConfig,
     val blockMutationLabel: UiItemConfig,
     val blockUseLabel: UiItemConfig,
     val entityDamageLabel: UiItemConfig,

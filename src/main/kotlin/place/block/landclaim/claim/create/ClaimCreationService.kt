@@ -4,6 +4,7 @@ import org.bukkit.Server
 import org.bukkit.block.Block
 import org.bukkit.entity.Player
 import place.block.landclaim.claim.ClaimCorner
+import place.block.landclaim.claim.ClaimOwnerType
 import place.block.landclaim.claim.ClaimValidationResult
 import place.block.landclaim.claim.ClaimValidator
 import place.block.landclaim.claim.budget.ClaimBlockBudgetService
@@ -36,7 +37,7 @@ class ClaimCreationService(
         if (existingClaim != null) {
             return ClaimCreationResult.SelectionRejected(
                 corner = clickedCorner,
-                ownerName = resolvePlayerName(existingClaim.ownerUuid),
+                ownerName = resolveOwnerName(existingClaim.ownerType, existingClaim.ownerUuid),
             )
         }
 
@@ -55,7 +56,7 @@ class ClaimCreationService(
         if (existingClaim != null) {
             return ClaimCreationResult.SelectionRejected(
                 corner = clickedCorner,
-                ownerName = resolvePlayerName(existingClaim.ownerUuid),
+                ownerName = resolveOwnerName(existingClaim.ownerType, existingClaim.ownerUuid),
             )
         }
 
@@ -108,14 +109,17 @@ class ClaimCreationService(
                 val firstOverlap = validation.overlappingClaims.first()
                 ClaimCreationResult.ClaimOverlapsExisting(
                     area = validation.area,
-                    ownerName = resolvePlayerName(firstOverlap.ownerUuid),
+                    ownerName = resolveOwnerName(firstOverlap.ownerType, firstOverlap.ownerUuid),
                     overlappingArea = firstOverlap.area,
                 )
             }
         }
     }
 
-    private fun resolvePlayerName(playerUuid: UUID): String {
-        return server.getOfflinePlayer(playerUuid).name ?: playerUuid.toString()
+    private fun resolveOwnerName(ownerType: ClaimOwnerType, playerUuid: UUID): String {
+        return when (ownerType) {
+            ClaimOwnerType.ADMIN -> "Server"
+            ClaimOwnerType.PLAYER -> server.getOfflinePlayer(playerUuid).name ?: playerUuid.toString()
+        }
     }
 }

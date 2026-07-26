@@ -6,9 +6,12 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.block.Action
+import org.bukkit.Material
 import org.bukkit.event.block.BlockExplodeEvent
 import org.bukkit.event.block.BlockBreakEvent
+import org.bukkit.event.block.BlockFromToEvent
 import org.bukkit.event.block.BlockPlaceEvent
+import org.bukkit.event.block.BlockSpreadEvent
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityExplodeEvent
@@ -96,6 +99,29 @@ class ClaimProtectionListener(
     }
 
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+    fun onBlockSpread(event: BlockSpreadEvent) {
+        if (!isFireBlock(event.newState.type)) {
+            return
+        }
+
+        if (!claimAccessService.isFireSpreadAllowed(event.source.location, event.block.location)) {
+            event.isCancelled = true
+        }
+    }
+
+    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+    fun onBlockFromTo(event: BlockFromToEvent) {
+        val material = event.block.type
+        if (!isLiquidBlock(material)) {
+            return
+        }
+
+        if (!claimAccessService.isLiquidFlowAllowed(event.block.location, event.toBlock.location, material)) {
+            event.isCancelled = true
+        }
+    }
+
+    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
     fun onExplosionEntityDamage(event: EntityDamageEvent) {
         if (event.cause != EntityDamageEvent.DamageCause.ENTITY_EXPLOSION &&
             event.cause != EntityDamageEvent.DamageCause.BLOCK_EXPLOSION
@@ -115,5 +141,13 @@ class ClaimProtectionListener(
             is Projectile -> damager.shooter as? Player
             else -> null
         }
+    }
+
+    private fun isFireBlock(material: Material): Boolean {
+        return material == Material.FIRE || material == Material.SOUL_FIRE
+    }
+
+    private fun isLiquidBlock(material: Material): Boolean {
+        return material == Material.WATER || material == Material.LAVA
     }
 }

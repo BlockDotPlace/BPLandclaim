@@ -3,6 +3,7 @@ package place.block.landclaim.command
 import org.bukkit.OfflinePlayer
 import org.bukkit.Server
 import org.bukkit.entity.Player
+import place.block.landclaim.claim.ClaimOwnerType
 import place.block.landclaim.claim.budget.ClaimBlockBudgetService
 import place.block.landclaim.claim.OwnedClaim
 import place.block.landclaim.claim.toOwnedClaim
@@ -23,17 +24,18 @@ class ClaimCommandService(
         val claim = findClaimAtPlayer(player)
             ?: return ClaimCommandResult.NotStandingInClaim("Claim info", yourClaimOnly = false)
 
-        val ownerName = resolvePlayerName(claim.ownerUuid.toString(), claim.ownerUuid)
+        val ownerName = ownerName(claim)
         val selfPermissions = claimPermissionRepository.findByClaimIdAndPlayerUuid(claim.id.value, player.uniqueId)
-        val selfTrusted = claim.ownerUuid == player.uniqueId || selfPermissions != null
+        val ownerAccess = isClaimOwner(claim, player)
+        val selfTrusted = ownerAccess || selfPermissions != null
 
         return ClaimCommandResult.Info(
             claim = claim,
             ownerName = ownerName,
             selfTrusted = selfTrusted,
-            selfBlockMutation = claim.ownerUuid == player.uniqueId || selfPermissions?.blockMutation == true,
-            selfBlockUse = claim.ownerUuid == player.uniqueId || selfPermissions?.blockUse == true,
-            selfEntityDamage = claim.ownerUuid == player.uniqueId || selfPermissions?.entityDamage == true,
+            selfBlockMutation = ownerAccess || selfPermissions?.blockMutation == true,
+            selfBlockUse = ownerAccess || selfPermissions?.blockUse == true,
+            selfEntityDamage = ownerAccess || selfPermissions?.entityDamage == true,
         )
     }
 
@@ -42,6 +44,23 @@ class ClaimCommandService(
             notOwnedClaimFailure(player, "Claim management")
         } else {
             null
+        }
+    }
+
+    fun setAdminClaim(player: Player, enabled: Boolean): ClaimCommandResult {
+        val claim = findOwnedClaimAtPlayer(player)
+            ?: return notOwnedClaimFailure(player, "Claim admin update")
+
+        val updated = claimRepository.updateOwnership(
+            claimId = claim.id.value,
+            ownerUuid = player.uniqueId,
+            ownerType = if (enabled) ClaimOwnerType.ADMIN else ClaimOwnerType.PLAYER,
+        )
+
+        return if (updated) {
+            ClaimCommandResult.AdminClaimUpdated(enabled)
+        } else {
+            ClaimCommandResult.ClaimDeleteFailed
         }
     }
 
@@ -56,16 +75,24 @@ class ClaimCommandService(
         val allowExplosions = when (attribute) {
             ClaimAttributeFlag.ALLOW_EXPLOSIONS -> value
             ClaimAttributeFlag.ALLOW_PVP -> claim.attributes.allowExplosions
+            ClaimAttributeFlag.ALLOW_FIRE_SPREAD -> claim.attributes.allowExplosions
         }
         val allowPvp = when (attribute) {
             ClaimAttributeFlag.ALLOW_EXPLOSIONS -> claim.attributes.allowPvp
             ClaimAttributeFlag.ALLOW_PVP -> value
+            ClaimAttributeFlag.ALLOW_FIRE_SPREAD -> claim.attributes.allowPvp
+        }
+        val allowFireSpread = when (attribute) {
+            ClaimAttributeFlag.ALLOW_EXPLOSIONS -> claim.attributes.allowFireSpread
+            ClaimAttributeFlag.ALLOW_PVP -> claim.attributes.allowFireSpread
+            ClaimAttributeFlag.ALLOW_FIRE_SPREAD -> value
         }
 
         val updated = claimRepository.updateAttributes(
             claimId = claim.id.value,
             allowExplosions = allowExplosions,
             allowPvp = allowPvp,
+            allowFireSpread = allowFireSpread,
         )
 
         return if (updated) {
@@ -115,7 +142,7 @@ class ClaimCommandService(
             ?: return notOwnedClaimFailure(player, "Whitelist")
         val target = resolveKnownPlayer(targetName)
             ?: return ClaimCommandResult.TargetPlayerNotFound("Whitelist", targetName)
-        if (target.uniqueId == player.uniqueId) {
+        if (isClaimOwnerEquivalent(claim, target)) {
             return ClaimCommandResult.AlreadyClaimOwner("Whitelist")
         }
 
@@ -137,7 +164,7 @@ class ClaimCommandService(
             ?: return notOwnedClaimFailure(player, "Unwhitelist")
         val target = resolveKnownPlayer(targetName)
             ?: return ClaimCommandResult.TargetPlayerNotFound("Unwhitelist", targetName)
-        if (target.uniqueId == player.uniqueId) {
+        if (isClaimOwnerEquivalent(claim, target)) {
             return ClaimCommandResult.AlreadyClaimOwner("Unwhitelist")
         }
 
@@ -159,7 +186,7 @@ class ClaimCommandService(
             ?: return notOwnedClaimFailure(player, "Permission update")
         val target = resolveKnownPlayer(targetName)
             ?: return ClaimCommandResult.TargetPlayerNotFound("Permission update", targetName)
-        if (target.uniqueId == player.uniqueId) {
+        if (isClaimOwnerEquivalent(claim, target)) {
             return ClaimCommandResult.OwnerHasFullAccess
         }
 
@@ -222,20 +249,38 @@ class ClaimCommandService(
 
     private fun findOwnedClaimAtPlayer(player: Player): OwnedClaim? {
         val claim = findClaimAtPlayer(player) ?: return null
-        return claim.takeIf { it.ownerUuid == player.uniqueId }
+        return claim.takeIf { isClaimOwner(it, player) }
     }
 
     private fun notOwnedClaimFailure(player: Player, action: String): ClaimCommandResult {
         val claim = findClaimAtPlayer(player)
             ?: return ClaimCommandResult.NotStandingInClaim(action)
 
-        val ownerName = resolvePlayerName(claim.ownerUuid.toString(), claim.ownerUuid)
+        val ownerName = ownerName(claim)
         return ClaimCommandResult.ClaimOwnedByOther(action, ownerName)
     }
 
     private fun resolveKnownPlayer(name: String): OfflinePlayer? {
         val offlinePlayer = server.getOfflinePlayer(name)
         return offlinePlayer.takeIf { it.isOnline || it.hasPlayedBefore() }
+    }
+
+    private fun isClaimOwner(claim: OwnedClaim, player: Player): Boolean {
+        return claim.isOwnedBy(player.uniqueId, player.isOp)
+    }
+
+    private fun isClaimOwnerEquivalent(claim: OwnedClaim, player: OfflinePlayer): Boolean {
+        return when (claim.ownerType) {
+            ClaimOwnerType.PLAYER -> claim.ownerUuid == player.uniqueId
+            ClaimOwnerType.ADMIN -> player.isOp
+        }
+    }
+
+    private fun ownerName(claim: OwnedClaim): String {
+        return when (claim.ownerType) {
+            ClaimOwnerType.ADMIN -> "Server"
+            ClaimOwnerType.PLAYER -> resolvePlayerName(claim.ownerUuid.toString(), claim.ownerUuid)
+        }
     }
 
     private fun resolvePlayerName(fallback: String, playerUuid: java.util.UUID): String {
