@@ -1,5 +1,7 @@
 package place.block.landclaim.listener
 
+import org.bukkit.entity.ArmorStand
+import org.bukkit.entity.ItemFrame
 import org.bukkit.entity.Player
 import org.bukkit.entity.Projectile
 import org.bukkit.event.EventHandler
@@ -16,6 +18,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityExplodeEvent
 import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.event.player.PlayerInteractEntityEvent
 import place.block.landclaim.chat.ChatMessages
 import place.block.landclaim.claim.access.ClaimAccessResult
 import place.block.landclaim.claim.access.ClaimAccessService
@@ -54,6 +57,21 @@ class ClaimProtectionListener(
 
         val clickedBlock = event.clickedBlock ?: return
         when (val result = claimAccessService.canAccess(event.player, clickedBlock, ClaimPermissionType.BLOCK_USE)) {
+            is ClaimAccessResult.Allowed -> return
+            is ClaimAccessResult.Denied -> {
+                event.isCancelled = true
+                event.player.sendMessage(ChatMessages.actionDenied("Use blocked", result.ownerName))
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+    fun onPlayerInteractEntity(event: PlayerInteractEntityEvent) {
+        if (event.rightClicked !is ItemFrame && event.rightClicked !is ArmorStand) {
+            return
+        }
+
+        when (val result = claimAccessService.canAccess(event.player, event.rightClicked, ClaimPermissionType.ENTITY_DAMAGE)) {
             is ClaimAccessResult.Allowed -> return
             is ClaimAccessResult.Denied -> {
                 event.isCancelled = true
