@@ -8,9 +8,15 @@ import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Monster
 import org.bukkit.entity.Player
 import org.bukkit.entity.WaterMob
+import org.bukkit.entity.ArmorStand
+import org.bukkit.entity.ItemFrame
 
 object ProtectedEntityClassifier {
     fun isProtected(entity: Entity): Boolean {
+        if (entity is ItemFrame || entity is ArmorStand) {
+            return true
+        }
+
         val livingEntity = entity as? LivingEntity ?: return false
         if (livingEntity is Player) {
             return false
