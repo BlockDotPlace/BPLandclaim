@@ -3,6 +3,10 @@ package place.block.landclaim.command
 import place.block.landclaim.claim.OwnedClaim
 
 sealed interface ClaimCommandResult {
+    data class Help(
+        val topic: String?,
+    ) : ClaimCommandResult
+
     data class Info(
         val claim: OwnedClaim,
         val ownerName: String,

@@ -33,16 +33,16 @@ class ClaimCommandExecutor(
             return send(sender, format(result))
         }
 
+        if (args.firstOrNull()?.equals("help", ignoreCase = true) == true || args.isEmpty()) {
+            return send(sender, format(ClaimCommandResult.Help(args.getOrNull(1))))
+        }
+
         val player = sender as? Player ?: run {
             format(ClaimCommandResult.PlayersOnly()).forEach(sender::sendMessage)
             return true
         }
 
         val result = when (args.firstOrNull()?.lowercase()) {
-            null, "", "help" -> ClaimCommandResult.Usage(
-                "Usage: /claim <info|blocks|delete|cancel|whitelist|unwhitelist|perms|attr|manage|admin|reload|cull>",
-            )
-
             "info" -> claimCommandService.info(player)
             "blocks" -> claimCommandService.blocks(player)
             "delete" -> claimCommandService.delete(player)
@@ -69,37 +69,35 @@ class ClaimCommandExecutor(
             }
             "whitelist" -> {
                 val targetName = args.getOrNull(1)
-                    ?: return send(player, listOf(ChatMessages.usage("Usage: /claim whitelist <player>")))
+                    ?: return send(player, ChatMessages.claimHelpLines("whitelist"))
                 claimCommandService.whitelist(player, targetName)
             }
 
             "unwhitelist" -> {
                 val targetName = args.getOrNull(1)
-                    ?: return send(player, listOf(ChatMessages.usage("Usage: /claim unwhitelist <player>")))
+                    ?: return send(player, ChatMessages.claimHelpLines("unwhitelist"))
                 claimCommandService.unwhitelist(player, targetName)
             }
 
             "perms" -> {
                 val targetName = args.getOrNull(1)
-                    ?: return send(player, listOf(ChatMessages.usage("Usage: /claim perms <player> <block_mutation|block_use|entity_damage> <true|false>")))
+                    ?: return send(player, ChatMessages.claimHelpLines("perms"))
                 val permission = args.getOrNull(2)?.let(ClaimPermissionFlag::parse)
-                    ?: return send(player, format(ClaimCommandResult.InvalidPermissionValue("Invalid permission: use block_mutation, block_use, or entity_damage.")))
+                    ?: return send(player, ChatMessages.claimHelpLines("perms"))
                 val value = args.getOrNull(3)?.toBooleanStrictOrNull()
-                    ?: return send(player, format(ClaimCommandResult.InvalidPermissionValue("Invalid value: use true or false.")))
+                    ?: return send(player, ChatMessages.claimHelpLines("perms"))
                 claimCommandService.setPermission(player, targetName, permission, value)
             }
 
             "attr" -> {
                 val attribute = args.getOrNull(1)?.let(ClaimAttributeFlag::parse)
-                    ?: return send(player, listOf(ChatMessages.usage("Usage: /claim attr <allow_explosions|allow_pvp|allow_fire_spread> <true|false>")))
+                    ?: return send(player, ChatMessages.claimHelpLines("attr"))
                 val value = args.getOrNull(2)?.toBooleanStrictOrNull()
-                    ?: return send(player, format(ClaimCommandResult.InvalidPermissionValue("Invalid value: use true or false.")))
+                    ?: return send(player, ChatMessages.claimHelpLines("attr"))
                 claimCommandService.setAttribute(player, attribute, value)
             }
 
-            else -> ClaimCommandResult.UnknownSubcommand(
-                "Unknown subcommand. Use /claim <info|blocks|delete|cancel|whitelist|unwhitelist|perms|attr|manage|admin|reload|cull>.",
-            )
+            else -> ClaimCommandResult.Help(null)
         }
 
         if (result is ClaimCommandResult.Cancelled) {
@@ -116,11 +114,14 @@ class ClaimCommandExecutor(
         args: Array<out String>,
     ): List<String> {
         return when (args.size) {
-            1 -> listOf("info", "blocks", "delete", "cancel", "whitelist", "unwhitelist", "perms", "attr", "manage", "admin", "cull")
+            1 -> listOf("help", "info", "blocks", "delete", "cancel", "whitelist", "unwhitelist", "perms", "attr", "manage", "admin", "cull")
                 .plus("reload")
                 .filter { it.startsWith(args[0], ignoreCase = true) }
 
             2 -> when {
+                args.getOrNull(0).equals("help", ignoreCase = true) ->
+                    HELP_TOPICS.filter { it.startsWith(args[1], ignoreCase = true) }
+
                 args.getOrNull(0).equals("attr", ignoreCase = true) ->
                     listOf("allow_explosions", "allow_pvp", "allow_fire_spread")
                         .filter { it.startsWith(args[1], ignoreCase = true) }
@@ -158,6 +159,8 @@ class ClaimCommandExecutor(
 
     private fun format(result: ClaimCommandResult): List<Component> {
         return when (result) {
+            is ClaimCommandResult.Help -> ChatMessages.claimHelpLines(result.topic)
+
             is ClaimCommandResult.Info -> ChatMessages.claimInfoLines(
                 result.ownerName,
                 result.claim.area.minX,
@@ -291,5 +294,19 @@ class ClaimCommandExecutor(
     private companion object {
         const val CULL_PERMISSION = "landclaim.admin.cull"
         const val RELOAD_PERMISSION = "landclaim.admin.reload"
+        val HELP_TOPICS = listOf(
+            "info",
+            "blocks",
+            "delete",
+            "cancel",
+            "manage",
+            "whitelist",
+            "unwhitelist",
+            "perms",
+            "attr",
+            "admin",
+            "reload",
+            "cull",
+        )
     }
 }

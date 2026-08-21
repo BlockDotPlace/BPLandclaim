@@ -7,6 +7,92 @@ import place.block.landclaim.claim.ClaimSizeLimitType
 import place.block.landclaim.claim.budget.ClaimOperationPreview
 
 object ChatMessages {
+    fun claimHelpLines(topic: String?): List<Component> {
+        return when (topic?.lowercase()) {
+            null, "", "help" -> listOf(
+                line(success("Claim Help")),
+                line(text("Use "), value("/claim help <topic>"), text(" for details.")),
+                line(text("Topics: "), value("info, blocks, delete, cancel, manage, whitelist, unwhitelist, perms, attr, admin, reload, cull")),
+            )
+
+            "info" -> helpTopic(
+                title = "Claim Info",
+                usage = "/claim info",
+                details = "Shows owner, bounds, size, your permissions, and claim attributes for the claim you are standing in.",
+            )
+
+            "blocks" -> helpTopic(
+                title = "Claim Blocks",
+                usage = "/claim blocks",
+                details = "Shows your playtime-based claim block pool, current usage, and remaining claim blocks.",
+            )
+
+            "delete" -> helpTopic(
+                title = "Claim Delete",
+                usage = "/claim delete",
+                details = "Deletes the claim you are standing in if you own it or can manage it as an admin claim owner.",
+            )
+
+            "cancel" -> helpTopic(
+                title = "Claim Cancel",
+                usage = "/claim cancel",
+                details = "Cancels active claim creation or resize mode.",
+            )
+
+            "manage" -> helpTopic(
+                title = "Claim Manage",
+                usage = "/claim manage",
+                details = "Opens the claim management UI for the claim you are standing in if you can manage it.",
+            )
+
+            "whitelist" -> helpTopic(
+                title = "Claim Whitelist",
+                usage = "/claim whitelist <player>",
+                details = "Adds a known player to the current claim with default build, use, and entity damage permissions.",
+            )
+
+            "unwhitelist" -> helpTopic(
+                title = "Claim Unwhitelist",
+                usage = "/claim unwhitelist <player>",
+                details = "Removes a player from the current claim whitelist.",
+            )
+
+            "perms" -> helpTopic(
+                title = "Claim Permissions",
+                usage = "/claim perms <player> <block_mutation|block_use|entity_damage> <true|false>",
+                details = "Updates one whitelist permission for one player on the current claim.",
+            )
+
+            "attr" -> helpTopic(
+                title = "Claim Attributes",
+                usage = "/claim attr <allow_explosions|allow_pvp|allow_fire_spread> <true|false>",
+                details = "Updates one claim-wide attribute for the claim you are standing in.",
+            )
+
+            "admin" -> helpTopic(
+                title = "Admin Claims",
+                usage = "/claim admin <on|off>",
+                details = "Converts the current claim between player-owned and server-owned admin claim state. Ops only.",
+            )
+
+            "reload" -> helpTopic(
+                title = "Claim Reload",
+                usage = "/claim reload",
+                details = "Hot-reloads config-driven claim systems without restarting the server. Admins only.",
+            )
+
+            "cull" -> helpTopic(
+                title = "Claim Cull",
+                usage = "/claim cull <hours> <preview|confirm>",
+                details = "Previews or deletes player-owned claims whose owners have played less than or equal to the given hours. Admins only.",
+            )
+
+            else -> listOf(
+                line(failure("Help failed"), text(": unknown topic "), value(topic), text(". Use "), value("/claim help"), text(".")),
+            )
+        }
+    }
+
     fun claimInfoLines(
         ownerName: String,
         minX: Int,
@@ -510,6 +596,18 @@ object ChatMessages {
     private fun infoTitle(text: String): Component {
         return Component.text(text, NamedTextColor.GREEN)
             .decorate(TextDecoration.UNDERLINED)
+    }
+
+    private fun helpTopic(
+        title: String,
+        usage: String,
+        details: String,
+    ): List<Component> {
+        return listOf(
+            line(success(title)),
+            line(text("Usage: "), value(usage)),
+            line(text(details)),
+        )
     }
 
     private fun line(vararg parts: Component): Component {

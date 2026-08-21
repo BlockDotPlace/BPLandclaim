@@ -5,7 +5,7 @@ api-version: '1.21'
 commands:
   claim:
     description: Manage land claims
-    usage: /claim <info|blocks|delete|cancel|whitelist|unwhitelist|perms|attr|manage|admin|reload|cull>
+    usage: /claim help
 permissions:
   landclaim.admin.cull:
     description: Allows manual claim culling by playtime threshold
